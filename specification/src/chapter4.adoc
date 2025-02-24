@@ -4,7 +4,7 @@
 
 This chapter provides a selection of non-exhaustive example security usecases based on commonly used
 deployment security models. The examples may be extended over time as required. This section is non normative
-guidance only, detailing the recommended combination of security requirements for the associated use case. 
+guidance only, detailing the recommended combination of security requirements for the associated use case.
 
 === Generic system without supervisor domains
 
@@ -77,11 +77,10 @@ See xref:chapter2.adoc#_reference_model[reference model].
 | Reference
 
 | A system level HW RoT is recommended
-| SR_ROT_001, 
+| SR_ROT_001,
 SR_ROT_002
 
 |===
-
 
 ==== Authorized Boot
 
@@ -118,19 +117,19 @@ transaction.
 |===
 | Requirement | Reference
 
-| Guarantee that devices assigned to lower 
-  privilege levels cannot access resources 
+| Guarantee that devices assigned to lower
+  privilege levels cannot access resources
   assigned to M-mode.
 |  SR_IOM_005, +
   (SR_IOP_001, SR_IOP_002, SR_IOP_003) +
   OR +
   (SR_IOM_001, SR_IOM_002, SR_IOM_003) +
- 
- 
-| Enforce access rules for devices assigned 
-  to user applications or guests on a virtualized 
+
+
+| Enforce access rules for devices assigned
+  to user applications or guests on a virtualized
   system.
-| SR_IOP_004 OR SR_IOM_004 
+| SR_IOP_004 OR SR_IOM_004
 
 |===
 
@@ -211,6 +210,222 @@ Guarantees the system remains attestable.
 Prevents using event counters to monitor across application or privilege
 boundaries. Event counters can be managed by higher privileged software as part
 of context switching across boundaries.
+
+=== TrustZone
+
+==== Overview
+
+// [caption="Figure {counter:image}: ", reftext="Figure {image}"]
+// [title= "TrustZone system"]
+
+TrustZone defines an isolation execution model enforced by the hart. There
+are two domains: *Secure* and *Non-Secure*. In the
+secure domain trusted applications execute under a trusted kernel, whereas in
+the non-secure domain untrusted applications/kernels execute under an
+untrusted kernel/hypervsior.
+The secure domain has access to the whole physical memory, but the non-secure
+domain only has access to the non-secure memory.
+
+In the non-secure domain, any kernel/hypervisor can be loaded. The untrusted
+kernel/hypervisor, in turn, can load any application according to its security
+policies. In the secure domain, only kernels that have been authenticated can
+be loaded, and only autenticated applications can be executed in the trusted
+kernel.
+
+Switching and managing non-secure/secure domains is performed by
+a secure monitor executing in M-mode, equivalent to a FW RoT, which is
+executing in the secure domain. The secure
+monitor is responsible for performing inter-domain context switches, and
+for resource sharing across domains. Entering the secure monitor is done
+through amninterrupt or through an exception, with the correct cause.
+Partitioning of the physical memory between the domain is performed by the
+secure monitor. By default, all memory belongs to the secure domain.
+
+NOTE: If in the non-secure domain a U-mode application performs a request to
+the secure monitor, the request must be passed through directly to M-mode. This
+can be achieved by zeroing the correct bit in `medeleg`/`mideleg` to the
+appropriate exception/interrupt. Not performing the following action mandates
+that the exception handler of the untrusted kernel also be part of the TCB.
+
+NOTE: RISC-V doesn't possess a dedicated bit indicating if a hart is in the
+secure or non-secure domain. However, the domain of the hart can be inferred
+by the state of the isolation primitives. By default, M-mode is always in the
+secure domain.
+
+TrustZone can have different partitioning models: static or dynamic. A static
+partitioning model is enforced solely by the secure monitor. The dynamic
+partitioning model is enforced by the secure monitor and by the Secure
+Partition Manager inside the secure domain. When a dynamic partitioning model
+is used, even though two trusted applications are in the same domain, they
+don't have access to each others assets unless permission has been granted.
+
+Hypervisors/Kernels are free to schedule any event/task within the non-secure
+domain. In the secure domain only the trusted OS or the Secure Partition
+Manager are allowed to schedule events/tasks. Within each domain, the isolation
+policy applied depends on the running hypervisor/kernel, and is applied on top
+of the isolation policy provided by the current domain.
+
+Secure domains can be created at any level of the privilege stack. Even though
+the previous text describes a system with a secure domain enforced at the
+machine level, as is the traditional case, it is also possible for RISC-V
+systems to create weaker secure domains at lower privileged levels. The
+isolation policy of the secure domain is constructed as a stack of isolation
+policies. For secure monitors that execute at a lower privilege level than
+machine, the memory is partitioned between the domains in accordance to the
+current memory abstraction, i.e., memory may be partitioned in
+virtual and guest physical memory and not just physical memory.
+
+// [caption="Figure {counter:image}: ", reftext="Figure {image}"]
+// [title= "RISC-V TrustZone system"]
+
+==== Isolation model
+
+[width=100%]
+[%header, cols="5,20"]
+|===
+| Requirement
+| Reference
+
+| Protect Secure domain from the Non-Secure domain.
+Secure domain has access to the memory in the non-secure domain.
+| (SR_PMP_001, SR_PMP_002) +
+  OR (SR_MPT_001, SR_MPT_002) +
+  OR (SR_SUD_001, SR_SUD_002) +
+  OR (SR_PMP_004, SR_PMP_005) +
+  OR (SR_MMU_001, SR_MMU_002)
+
+| Protect the Secure Monitor from lower privilege levels.
+| (SR_PMP_001, SR_PMP_002) OR SR_PMP_004 OR SR_MMU_001
+
+| Non-Secure domain doesn't have access to the assets in the secure domain.
+| SR_SUD_004 or SR_MMU_003 OR SR_PMP_005
+
+|===
+
+See xref:chapter3.adoc#_pmp_and_epmp[PMP and Smepmp]
+
+See xref:chapter3.adoc#_spmp[sPMP]
+
+See xref:chapter3.adoc#_mmu[MMU]
+
+Using the aforementioned requirements one can use the isolation primitives to
+create Secure and Non-Secure domains. In a conventional model, the secure and
+non-secure domains are split into two equal memory regions where the
+the secure and non-secure domain memory region are separated using MSB
+of the address. If MSB is high, it points to the secure domain.
+Otherwise, it points to the non-secure domain. Other models may exist.
+
+==== Root of Trust
+
+See xref:chapter2.adoc#_reference_model[reference model].
+
+[width=100%]
+[%header, cols="5,20"]
+|===
+| Requirement
+| Reference
+
+| A system level HW RoT is recommended
+| SR_ROT_001, SR_ROT_002
+
+|===
+
+In the event a HW RoT is available, an IOPMP, IOMPT, or IOMMU may be used at the hart
+boundaries to move the responsibility of isolation enforcement from the secure
+monitor to the HW RoT. The previously described secure/non-secure domain isolation
+can still be employed. On a domain switch, the execution environment can call
+the HW RoT through a dedicated system interrupt to perform the required IOPMP
+IOMPT, or IOMMU changes.
+
+==== Authorized Boot
+
+Multiple models can be used to ensure a secure system can only run authorized
+software.
+
+See xref:chapter2.adoc#_authorized_software[authorized software].
+
+==== Attestation
+
+Multiple models can be used to prove to a relying party that a secure system is
+in a trustworthy state.
+
+See xref:chapter2.adoc#_attestable_services[attestable services].
+
+==== Sealing
+
+Multiple models can be used to protect assets if a system is not in a
+trustworthy state.
+
+See xref:chapter2.adoc#_sealing[sealing].
+
+==== Device access control
+
+For the purpose of this specification, a device can be a logical device. A
+physical device can present one or more logical devices, each with its own
+(logical) control interface.
+
+Isolation guarantees provided to software also apply to device initiated
+transaction.
+
+[width=100%]
+[%header, cols="1,^1"]
+|===
+| Requirement | Reference
+
+| Guarantee that devices assigned to non-secure domain
+  cannot access resources assigned to secure domains.
+|  SR_IOM_005, +
+  (SR_IOP_001, SR_IOP_002, SR_IOP_003) +
+  OR +
+  (SR_IOM_001, SR_IOM_002, SR_IOM_003) +
+
+|===
+
+Non-Secure devices can be managed by a secure monitor which can
+enforce access rules for Non-Secure applications.
+
+==== Debug and performance management
+
+See xref:chapter2.adoc#_security_lifecycle[security life cycle]. +
+See https://github.com/riscv-non-isa/riscv-external-debug-security[RISC-V external debug security]
+
+[width=100%]
+[%header, cols="5,20"]
+|===
+| Requirement
+| Reference
+
+| Securely control debug access
+| SR_DBG_001
+
+| Allow Debug of non-M-mode software while blocking debug of higher privileged secure domains
+| SR_DBG_002
+
+| Allow Self-hosted debug of non-secure software
+| SR_DBG_003, SR_DBG_004
+
+|===
+
+For example, external debug can be enabled for non-M-mode non-secure
+and secure domains without affecting M-mode (recoverable debug). And an
+S-/H-mode secure monitor can enable self-hosted debug for a
+non-secure application without affecting other applications/kernels
+or S-/H-mode.
+
+[width=100%]
+[%header, cols="5,20"]
+|===
+| Requirement
+| Reference
+
+| Protect a domain against monitoring or DOS by other domains
+| SR_PMU_001, SR_PMU_002, SR_QOS_001, SR_QOS_002, SR_DOS_001, SR_DOS_002
+
+|===
+
+Prevents using event counters to monitor across domains. Event counters can
+be managed by higher privileged software as part of context switching
+across domain boundaries.
 
 === Global Platform TEE
 
@@ -339,7 +554,7 @@ See xref:chapter3.adoc#_mtt[MTT]
 between TA in TEE domain.
 | SR_PMP_005 OR SR_MMU_003
 
-| For a virtualized TEE, use hypervisor extension 
+| For a virtualized TEE, use hypervisor extension
 | SR_HYP_001,SR_MMU_001, SR_MMU_002,
 
 | For a virtualized TEE, sPMP or MMU MUST be used to enforce isolation between guest

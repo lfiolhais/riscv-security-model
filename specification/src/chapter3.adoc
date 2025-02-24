@@ -153,12 +153,6 @@ memory allocations to its workloads.
 
 NOTE: Dependent on the use case, it may be recommended or mandatory to protect supervisor mode from lower privilege levels (with or without the H-extension). Trusted execution environments may require the use of sPMP to isolate trusted applications from each other. The MMU may be an additional or alternative mechanism.
 
-
-
-
-
-
-
 ==== MMU
 
 *See sections 4.3 to 4.6 (Page-Based Virtual-Memory Systems) of the https://github.com/riscv/riscv-isa-manual/releases/tag/Priv-v1.12[Privileged
@@ -229,8 +223,6 @@ levels
 
 |===
 
-
-
 NOTE: The M-Mode resident software responsible for managing context switches and communication between supervisor
 domains is called the Root Domain. Depending on the use case, MTT can be sufficient for protecting the Root Domain by enabling M-mode
 to ensure that its own resources are never assigned to any another domain.
@@ -272,7 +264,7 @@ supervisor domain boundaries is required.
 | Resources assigned to a trusted supervisor domain MUST be inaccessible to an untrusted supervisor domain
 
 | SR_SUD_004
-| Resources assigned to an untrusted supervisor domain MUST be accessible to a trusted supervisor domain 
+| Resources assigned to an untrusted supervisor domain MUST be accessible to a trusted supervisor domain
 |===
 
 Supervisor domains allow resource isolation and sharing between domains under the control of M-mode firmware. Trusted Execution environments can require asymmetric sharing models, where one trusted domain has R/W access to other domain's resources.
@@ -567,7 +559,7 @@ In the context of this document, _architectural metadata_ refers to any data tha
 
 Examples (not exhaustive) where architectural metadata is required in the RISC-V architecture include:  MTT, memory tagging, and CHERI.
 
-Architectural metadata storage is implementation defined, but the following rules should be considered by any implementation. 
+Architectural metadata storage is implementation defined, but the following rules should be considered by any implementation.
 
 [width=100%]
 [%header, cols="5,20"]
@@ -586,7 +578,7 @@ Architectural metadata storage is implementation defined, but the following rule
 
 |===
 
-See xref:chapter2.adoc#_adversarial_model[adversarial model] 
+See xref:chapter2.adoc#_adversarial_model[adversarial model]
 
 For example, architectural metadata storage may be implemented in on-chip memory, or in cryptographically protected external DDR.
 
@@ -622,7 +614,7 @@ Depending on use case, architectural metadata may be visible to or managed by, f
 
 Architectural metadata needs to be protected against both unauthorized access (read or modify), boot attacks, relocation attacks, and errors (accidental or malicious).
 
-On systems where architectural metadata is stored in external memory, and external memory attacks are in scope (for example, directly accessible or replaceable external memory), then cryptographic protection with replay protection or temporal freshness is strongly recommended. 
+On systems where architectural metadata is stored in external memory, and external memory attacks are in scope (for example, directly accessible or replaceable external memory), then cryptographic protection with replay protection or temporal freshness is strongly recommended.
 
 [width=100%]
 [%header, cols="5,20"]
