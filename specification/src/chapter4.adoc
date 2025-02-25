@@ -259,11 +259,6 @@ appropriate exception/interrupt. Not performing the following action mandates
 that the exception handler of the untrusted kernel also be part of the TCB.
 Certain architectures may provide a dedicated instruction to call the RDSM.
 
-NOTE: RISC-V doesn't possess a dedicated bit indicating if a hart is in the
-secure or non-secure domain. However, the domain of the hart can be inferred
-by the state of the isolation primitives. By default, M-mode is always in the
-secure domain.
-
 Domain isolation can have different partitioning models: static or dynamic.
 A static partitioning model is enforced solely by the RDSM. The
 dynamic partitioning model is enforced by the RDSM and by the Supervisor
