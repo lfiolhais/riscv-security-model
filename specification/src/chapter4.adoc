@@ -211,20 +211,31 @@ Prevents using event counters to monitor across application or privilege
 boundaries. Event counters can be managed by higher privileged software as part
 of context switching across boundaries.
 
-=== TrustZone
+=== Domain Isolation
 
 ==== Overview
 
 // [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-// [title= "TrustZone system"]
+// [title= "Domain Isolation at the Machine Level"]
 
-TrustZone defines an isolation execution model enforced by the hart. There
-are two domains: *Secure* and *Non-Secure*. In the
+Domain isolation is a technique that confines architectural state across
+multiple domains. The isolation is enforced by a set of hardware primitives
+and software components, together forming the TCB of the system. Each domain
+can define its own set of security policies dictating which software can be
+executed and under what execution context, and what resources each domain
+has access to. A domain adds to the current RISC-V's privilege level isolation
+model by providing an orthogonal isolation mechanism between workloads
+executing in lower privilege levels. The domain switching and communication
+between domain is handled by a software component residing in a higher
+privileged level.
+
+In the typical case there are two domains: *Secure* and *Non-Secure*. In the
 secure domain trusted applications execute under a trusted kernel, whereas in
 the non-secure domain untrusted applications/kernels execute under an
-untrusted kernel/hypervsior.
-The secure domain has access to the whole physical memory, but the non-secure
-domain only has access to the non-secure memory.
+untrusted kernel/hypervisor. The secure domain has access to the whole
+physical memory and all other resources, but the non-secure domain only has
+access to the non-secure memory portion of the physical and non-secure
+resources.
 
 In the non-secure domain, any kernel/hypervisor can be loaded. The untrusted
 kernel/hypervisor, in turn, can load any application according to its security
@@ -233,52 +244,65 @@ be loaded, and only autenticated applications can be executed in the trusted
 kernel.
 
 Switching and managing non-secure/secure domains is performed by
-a secure monitor executing in M-mode, equivalent to a FW RoT, which is
-executing in the secure domain. The secure
+the Root Domain Security Manager (RDSM) executing in M-mode, equivalent to
+a FW RoT, which is executing in the secure domain. The secure
 monitor is responsible for performing inter-domain context switches, and
-for resource sharing across domains. Entering the secure monitor is done
-through amninterrupt or through an exception, with the correct cause.
+for resource sharing across domains. Entering the RDSM is done
+through an interrupt or through an exception, with the correct cause.
 Partitioning of the physical memory between the domain is performed by the
-secure monitor. By default, all memory belongs to the secure domain.
+RDSM. By default, all memory belongs to the secure domain.
 
 NOTE: If in the non-secure domain a U-mode application performs a request to
-the secure monitor, the request must be passed through directly to M-mode. This
+the RDSM, the request must be passed through directly to M-mode. This
 can be achieved by zeroing the correct bit in `medeleg`/`mideleg` to the
 appropriate exception/interrupt. Not performing the following action mandates
 that the exception handler of the untrusted kernel also be part of the TCB.
+Certain architectures may provide a dedicated instruction to call the RDSM.
 
 NOTE: RISC-V doesn't possess a dedicated bit indicating if a hart is in the
 secure or non-secure domain. However, the domain of the hart can be inferred
 by the state of the isolation primitives. By default, M-mode is always in the
 secure domain.
 
-TrustZone can have different partitioning models: static or dynamic. A static
-partitioning model is enforced solely by the secure monitor. The dynamic
-partitioning model is enforced by the secure monitor and by the Secure
-Partition Manager inside the secure domain. When a dynamic partitioning model
-is used, even though two trusted applications are in the same domain, they
-don't have access to each others assets unless permission has been granted.
+Domain isolation can have different partitioning models: static or dynamic.
+A static partitioning model is enforced solely by the RDSM. The
+dynamic partitioning model is enforced by the RDSM and by the Supervisor
+Domain Security Manager (SDSM) inside the secure domain. When a dynamic
+partitioning model is used, even though two trusted applications are in th
+e same domain, they don't have access to each others assets unless permission
+has been granted.
 
-Hypervisors/Kernels are free to schedule any event/task within the non-secure
-domain. In the secure domain only the trusted OS or the Secure Partition
-Manager are allowed to schedule events/tasks. Within each domain, the isolation
-policy applied depends on the running hypervisor/kernel, and is applied on top
-of the isolation policy provided by the current domain.
+The previous text describes a high-level overview of a traditional domain
+isolation with a narrow definition of what is secure and non-secure. In
+practice, often times there is no such clear distinction, or
+no indication about which domain is more trustworthy than the other.
+Further, unlike previously stated, domains may not be constructed in an
+hierarchical fashion such that one or more domains have access to the
+resources of a less trustworthy domain. Finally, domains can be contructed
+and enforced at the system level with a broader definition of resources that
+may or may not encompass harts. With this definition, the concepts that
+underpin domain isolation can be expanded such that they make
+use of different isolation primitives more suited to the security policies
+that need to enforced.
 
-Secure domains can be created at any level of the privilege stack. Even though
-the previous text describes a system with a secure domain enforced at the
-machine level, as is the traditional case, it is also possible for RISC-V
-systems to create weaker secure domains at lower privileged levels. The
-isolation policy of the secure domain is constructed as a stack of isolation
-policies. For secure monitors that execute at a lower privilege level than
-machine, the memory is partitioned between the domains in accordance to the
-current memory abstraction, i.e., memory may be partitioned in
+Domains can be created at any level of the privilege stack up to S. Therefore,
+the Domain Security Manager (DSM) doesn't have to be confined to M-level or
+S-level, or even to the isolation primitives of a hart. The isolation policy of
+the domain, enforced by the DSM is constructed as a stack of isolation policies
+borrowed by high-privileged security policies. For DSMs that execute at lower
+privilege levels, the resources are shared/partitioned between the domains in
+accordance to the security policy. For example, memory may be partitioned in
 virtual and guest physical memory and not just physical memory.
 
 // [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-// [title= "RISC-V TrustZone system"]
+// [title= "Domain Isolation at a non-M-level"]
 
 ==== Isolation model
+
+Due to the vast methods a domain can be created, the isolation model only
+describes isolation requirements between domains. It is assumed that the
+isolation requirement orthogonal to domains is inherited by the execution
+context.
 
 [width=100%]
 [%header, cols="5,20"]
@@ -286,19 +310,15 @@ virtual and guest physical memory and not just physical memory.
 | Requirement
 | Reference
 
-| Protect Secure domain from the Non-Secure domain.
-Secure domain has access to the memory in the non-secure domain.
+| Protect assets from one domain from another domain.
 | (SR_PMP_001, SR_PMP_002) +
   OR (SR_MPT_001, SR_MPT_002) +
   OR (SR_SUD_001, SR_SUD_002) +
   OR (SR_PMP_004, SR_PMP_005) +
   OR (SR_MMU_001, SR_MMU_002)
 
-| Protect the Secure Monitor from lower privilege levels.
+| Protect the DSM from lower privilege levels.
 | (SR_PMP_001, SR_PMP_002) OR SR_PMP_004 OR SR_MMU_001
-
-| Non-Secure domain doesn't have access to the assets in the secure domain.
-| SR_SUD_004 or SR_MMU_003 OR SR_PMP_005
 
 |===
 
@@ -307,13 +327,6 @@ See xref:chapter3.adoc#_pmp_and_epmp[PMP and Smepmp]
 See xref:chapter3.adoc#_spmp[sPMP]
 
 See xref:chapter3.adoc#_mmu[MMU]
-
-Using the aforementioned requirements one can use the isolation primitives to
-create Secure and Non-Secure domains. In a conventional model, the secure and
-non-secure domains are split into two equal memory regions where the
-the secure and non-secure domain memory region are separated using MSB
-of the address. If MSB is high, it points to the secure domain.
-Otherwise, it points to the non-secure domain. Other models may exist.
 
 ==== Root of Trust
 
@@ -330,12 +343,12 @@ See xref:chapter2.adoc#_reference_model[reference model].
 
 |===
 
-In the event a HW RoT is available, an IOPMP, IOMPT, or IOMMU may be used at the hart
-boundaries to move the responsibility of isolation enforcement from the secure
-monitor to the HW RoT. The previously described secure/non-secure domain isolation
+In the event a HW RoT is available, an IOPMP, IOMPT, or IOMMU may be used at
+the hart boundaries to move the responsibility of isolation enforcement from
+the hart to the HW RoT. The previously described domain isolation
 can still be employed. On a domain switch, the execution environment can call
-the HW RoT through a dedicated system interrupt to perform the required IOPMP
-IOMPT, or IOMMU changes.
+the HW RoT through a dedicated system interrupt, or through a mailbox to
+perform the required IOPMP IOMPT, or IOMMU changes.
 
 ==== Authorized Boot
 
@@ -372,17 +385,14 @@ transaction.
 |===
 | Requirement | Reference
 
-| Guarantee that devices assigned to non-secure domain
-  cannot access resources assigned to secure domains.
+| Guarantee that devices assigned to one domain
+  cannot access resources assigned to other domains.
 |  SR_IOM_005, +
   (SR_IOP_001, SR_IOP_002, SR_IOP_003) +
   OR +
   (SR_IOM_001, SR_IOM_002, SR_IOM_003) +
 
 |===
-
-Non-Secure devices can be managed by a secure monitor which can
-enforce access rules for Non-Secure applications.
 
 ==== Debug and performance management
 
@@ -406,10 +416,9 @@ See https://github.com/riscv-non-isa/riscv-external-debug-security[RISC-V extern
 
 |===
 
-For example, external debug can be enabled for non-M-mode non-secure
-and secure domains without affecting M-mode (recoverable debug). And an
-S-/H-mode secure monitor can enable self-hosted debug for a
-non-secure application without affecting other applications/kernels
+For example, external debug can be enabled for non-M-mode domains without
+affecting M-mode (recoverable debug). And an S-/H-mode DSM can enable
+self-hosted debug for a domain without affecting other applications/kernels
 or S-/H-mode.
 
 [width=100%]
