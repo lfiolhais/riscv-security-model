@@ -215,9 +215,6 @@ of context switching across boundaries.
 
 ==== Overview
 
-// [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-// [title= "Domain Isolation at the Machine Level"]
-
 Domain isolation is a technique that confines architectural state across
 multiple domains. The isolation is enforced by a set of hardware primitives
 and software components, together forming the TCB of the system. Each domain
@@ -236,6 +233,10 @@ untrusted kernel/hypervisor. The secure domain has access to the whole
 physical memory and all other resources, but the non-secure domain only has
 access to the non-secure memory portion of the physical and non-secure
 resources.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Domain Isolation at the Machine Level"]
+image::img_ch4_DIsoMLevel.drawio.png[]
 
 In the non-secure domain, any kernel/hypervisor can be loaded. The untrusted
 kernel/hypervisor, in turn, can load any application according to its security
@@ -289,8 +290,13 @@ privilege levels, the resources are shared/partitioned between the domains in
 accordance to the security policy. For example, memory may be partitioned in
 virtual and guest physical memory and not just physical memory.
 
-// [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-// [title= "Domain Isolation at a non-M-level"]
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Domain Isolation at non-M-level"]
+image::img_ch4_DIsoMultPrivLevel.drawio.png[]
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Domain Isolation at System Level"]
+image::img_ch4_DIsoSysLevel.drawio.png[]
 
 ==== Isolation model
 
