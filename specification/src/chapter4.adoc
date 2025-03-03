@@ -51,7 +51,7 @@ non-security services.
 
 |===
 
-See xref:chapter3.adoc#_pmp_and_epmp[PMP and Smepmp]
+See xref:chapter3.adoc#_pmp[PMP] and xref:chapter3.adoc#_smepmp[Smepmp]
 
 See xref:chapter3.adoc#_spmp[sPMP]
 
@@ -211,7 +211,7 @@ Prevents using event counters to monitor across application or privilege
 boundaries. Event counters can be managed by higher privileged software as part
 of context switching across boundaries.
 
-=== Domain Isolation
+=== Global Platform TEE
 
 ==== Overview
 
@@ -219,235 +219,22 @@ Domain isolation is a technique that confines architectural state across
 multiple domains. The isolation is enforced by a set of hardware primitives
 and software components, together forming the TCB of the system. Each domain
 can define its own set of security policies dictating which software can be
-executed and under what execution context, and what resources each domain
+executed under what execution context, and what resources each domain
 has access to. A domain adds to the current RISC-V's privilege level isolation
 model by providing an orthogonal isolation mechanism between workloads
 executing in lower privilege levels. The domain switching and communication
 between domains is handled by a software component residing in a higher
 privileged level.
 
-In the typical case, there are two domains: *Secure* and *Non-Secure*. In the
-secure domain, trusted applications execute under a trusted kernel, whereas in
-the non-secure domain, untrusted applications/kernels execute under an
-untrusted kernel/hypervisor. The secure domain has access to the whole
-physical memory and all other resources, but the non-secure domain only has
-access to the non-secure memory portion of the physical and non-secure
-resources.
-
-[caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "Domain Isolation at the Machine Level"]
-image::img_ch4_DIsoMLevel.drawio.png[]
-
-In the non-secure domain, any kernel/hypervisor can be loaded. The untrusted
-kernel/hypervisor, in turn, can load any application according to its security
-policies. In the secure domain, only kernels that have been authenticated can
-be loaded, and only authenticated applications can be executed in the trusted
-kernel.
-
-Switching and managing non-secure/secure domains is performed by
-the Root Domain Security Manager (RDSM) executing in M-mode, equivalent to
-a FW RoT, which is executing in the secure domain. The secure
-monitor is responsible for performing inter-domain context switches and
-for resource sharing across domains. Entering the RDSM is done
-through an interrupt or through an exception, with the correct cause.
-Partitioning of the physical memory between the domains is performed by the
-RDSM. By default, all memory belongs to the secure domain.
-
-NOTE: If in the non-secure domain a U-mode application performs a request to
-the RDSM, the request must be passed through directly to M-mode. This
-can be achieved by zeroing the correct bit in `medeleg`/`mideleg` to the
-appropriate exception/interrupt. Not performing the following action mandates
-that the exception handler of the untrusted kernel also be part of the TCB.
-Certain architectures may provide a dedicated instruction to call the RDSM.
-
-Domain isolation can have different partitioning models: static or dynamic.
-A static partitioning model is enforced solely by the RDSM. The
-dynamic partitioning model is enforced by the RDSM and by the Supervisor
-Domain Security Manager (SDSM) inside the secure domain. When a dynamic
-partitioning model is used, even though two trusted applications are in the
-same domain, they don't have access to each other's assets unless permission
-has been granted.
-
-The previous text describes a high-level overview of a traditional domain
-isolation with a narrow definition of what is secure and non-secure. In
-practice, often times there is no such clear distinction, or
-no indication about which domain is more trustworthy than the other.
-Further, unlike previously stated, domains may not be constructed in an
-hierarchical fashion such that one or more domains have access to the
-resources of a less trustworthy domain. Finally, domains can be constructed
-and enforced at the system level with a broader definition of resources that
-may or may not encompass harts. With this definition, the concepts that
-underpin domain isolation can be expanded such that they make
-use of different isolation primitives more suited to the security policies
-that need to be enforced.
-
-Domains can be created at any level of the privilege stack up to S. Therefore,
-the Domain Security Manager (DSM) doesn't have to be confined to M-level or
-S-level, or even to the isolation primitives of a hart. The isolation policy of
-the domain, enforced by the DSM, is constructed as a stack of isolation policies
-borrowed by high-privileged security policies. For DSMs that execute at lower
-privilege levels, the resources are shared/partitioned between the domains in
-accord with the security policy. For example, memory may be partitioned in
-virtual and guest physical memory and not just physical memory.
-
-[caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "Domain Isolation at non-M-level"]
-image::img_ch4_DIsoMultPrivLevel.drawio.png[]
-
-[caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "Domain Isolation at System Level"]
-image::img_ch4_DIsoSysLevel.drawio.png[]
-
-==== Isolation model
-
-Due to the vast methods a domain can be created, the isolation model only
-describes isolation requirements between domains. It is assumed that the
-isolation requirement orthogonal to domains is inherited by the execution
-context.
-
-[width=100%]
-[%header, cols="5,20"]
-|===
-| Requirement
-| Reference
-
-| Protect assets from one domain from another domain.
-| (SR_PMP_001, SR_PMP_002) +
-  OR (SR_MPT_001, SR_MPT_002) +
-  OR (SR_SUD_001, SR_SUD_002) +
-  OR (SR_PMP_004, SR_PMP_005) +
-  OR (SR_MMU_001, SR_MMU_002)
-
-| Protect the DSM from lower privilege levels.
-| (SR_PMP_001, SR_PMP_002) OR SR_PMP_004 OR SR_MMU_001
-
-|===
-
-See xref:chapter3.adoc#_pmp_and_epmp[PMP and Smepmp]
-
-See xref:chapter3.adoc#_spmp[sPMP]
-
-See xref:chapter3.adoc#_mmu[MMU]
-
-==== Root of Trust
-
-See xref:chapter2.adoc#_reference_model[reference model].
-
-[width=100%]
-[%header, cols="5,20"]
-|===
-| Requirement
-| Reference
-
-| A system level HW RoT is recommended
-| SR_ROT_001, SR_ROT_002
-
-|===
-
-In the event a HW RoT is available, an IOPMP, IOMPT, or IOMMU may be used at
-the hart boundaries to move the responsibility of isolation enforcement from
-the hart to the HW RoT. The previously described domain isolation
-can still be employed. On a domain switch, the execution environment can call
-the HW RoT through a dedicated system interrupt, or through a mailbox to
-perform the required IOPMP IOMPT, or IOMMU changes.
-
-==== Authorized Boot
-
-Multiple models can be used to ensure a secure system can only run authorized
-software.
-
-See xref:chapter2.adoc#_authorized_software[authorized software].
-
-==== Attestation
-
-Multiple models can be used to prove to a relying party that a secure system is
-in a trustworthy state.
-
-See xref:chapter2.adoc#_attestable_services[attestable services].
-
-==== Sealing
-
-Multiple models can be used to protect assets if a system is not in a
-trustworthy state.
-
-See xref:chapter2.adoc#_sealing[sealing].
-
-==== Device access control
-
-For the purpose of this specification, a device can be a logical device. A
-physical device can present one or more logical devices, each with its own
-(logical) control interface.
-
-Isolation guarantees provided to software also apply to device initiated
-transaction.
-
-[width=100%]
-[%header, cols="1,^1"]
-|===
-| Requirement | Reference
-
-| Guarantee that devices assigned to one domain
-  cannot access resources assigned to other domains.
-|  SR_IOM_005, +
-  (SR_IOP_001, SR_IOP_002, SR_IOP_003) +
-  OR +
-  (SR_IOM_001, SR_IOM_002, SR_IOM_003) +
-
-|===
-
-==== Debug and performance management
-
-See xref:chapter2.adoc#_security_lifecycle[security life cycle]. +
-See https://github.com/riscv-non-isa/riscv-external-debug-security[RISC-V external debug security]
-
-[width=100%]
-[%header, cols="5,20"]
-|===
-| Requirement
-| Reference
-
-| Securely control debug access
-| SR_DBG_001
-
-| Allow Debug of non-M-mode software while blocking debug of higher privileged secure domains
-| SR_DBG_002
-
-| Allow Self-hosted debug of non-secure software
-| SR_DBG_003, SR_DBG_004
-
-|===
-
-For example, external debug can be enabled for non-M-mode domains without
-affecting M-mode (recoverable debug). And an S-/H-mode DSM can enable
-self-hosted debug for a domain without affecting other applications/kernels
-or S-/H-mode.
-
-[width=100%]
-[%header, cols="5,20"]
-|===
-| Requirement
-| Reference
-
-| Protect a domain against monitoring or DOS by other domains
-| SR_PMU_001, SR_PMU_002, SR_QOS_001, SR_QOS_002, SR_DOS_001, SR_DOS_002
-
-|===
-
-Prevents using event counters to monitor across domains. Event counters can
-be managed by higher privileged software as part of context switching
-across domain boundaries.
-
-=== Global Platform TEE
-
-==== Overview
+One set of standards that leverages domain isolation is
+Global Platform. https://globalplatform.org/[Global platform]
+defines technical standards, interface specifications and programming models,
+open source firmware, and certification programs for
+_trusted execution environments (TEE)_.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "Global platform TEE use cases"]
 image::img_ch4_gp-tee.png[]
-
-https://globalplatform.org/[Global platform] defines technical standards,
-interface specifications and programming models, open source firmware, and
-certification programs for _trusted execution environments (TEE)_.
 
 A TEE is an isolated environment providing security services. TEE services can
 be available to software on multiple Harts. For example:
@@ -482,9 +269,9 @@ For the purpose of this specification, TEE deployment models can be separated
 as:
 
 * Static partitioning TEE +
-A single TEE provides security services to Normal domain. TA are typically
+A single TEE provides security services to the Normal domain. TAs are typically
 installed at boot by RoT FW and TEE OS, though Global Platform does also define
-protocols for installation of TA at runtime. System configuration and resource
+protocols for installation of TAs at runtime. System configuration and resource
 allocation can be mostly static, making the system more deterministic. +
  +
 _Use case examples:_ edge devices and IoT, automation, and automotive.
@@ -495,6 +282,31 @@ guests (for example, an OEM TEE and separate third party TEE). This model can
 also support more dynamic resource allocation. +
  +
 _Use case examples:_ mobile clients, and automotive.
+
+Global Platform describes a high-level overview of a traditional domain
+isolation with a specific definition of three domains with varying security
+policies. The normal domains is considered to be non-secure, and the
+TEE and Root domains are considered secure. In practice, often times there
+is no such clear distinction, or no indication about which domain is more
+trustworthy than the other. Further, unlike previously stated, domains may
+not be constructed in an hierarchical fashion such that one or more domains
+have access to the resources of a less trustworthy domain. Finally, domains
+can be constructed and enforced at the system level with a broader definition
+of resources that may or may not encompass harts. With this definition, the
+concepts that underpin domain isolation can be expanded such that they make
+use of different isolation primitives more suited to the security policies
+that need to be enforced.
+
+Domains can be created at any level of the privilege stack up to S. Therefore,
+a Domain Security Manager (DSM) doesn't have to be confined to M-level or
+S-level, or even to the isolation primitives of a hart. The isolation policy of
+the domain, enforced by the DSM, is constructed as a stack of isolation policies
+inherited by high-privileged security policies. For DSMs that execute at lower
+privilege levels, the resources are shared/partitioned between the domains in
+accord with the security policy.
+
+This section focuses only on the Global Platform set of standards.
+However, more broader cases will be pointed out where necessary.
 
 ==== Isolation model
 
@@ -545,11 +357,17 @@ can be cached when context switching between Normal and TEE domains.
 RISC-V hardware enforced isolation mechanisms can be used as follows to meet
 those guarantees:
 
-See xref:chapter3.adoc#_supervisor_domains[supervisor domains].
-See xref:chapter3.adoc#_pmp_and_epmp[PMP and Smepmp]
+See xref:chapter3.adoc#_supervisor_domains_and_mpt[supervisor domains].
+See xref:chapter3.adoc#_pmp[PMP] and xref:chapter3.adoc#_smepmp[Smepmp]
 See xref:chapter3.adoc#_spmp[sPMP]
 See xref:chapter3.adoc#_mmu[MMU]
 See xref:chapter3.adoc#_mtt[MTT]
+
+In a broader definition of Domain Isolation, there are no guarantees that the
+root domain has access to the resources of any other domain. The enforced
+isolation policy may not allow the root domain, or any higher-order domain, to
+access resources of any domain, even if the domain is in a lower rank in the
+hierarchical chain.
 
 [width=100%]
 [%header, cols="5,20"]
@@ -587,6 +405,25 @@ See xref:chapter2.adoc#_reference_model[reference model].
 | SR_TOT_001, SR_ROT_002
 
 |===
+
+In the event a HW RoT is available and under a broader definition of domain
+isolation, an IOPMP, IOMPT, or IOMMU may be used at the hart boundaries to
+move the responsibility of isolation enforcement from the hart to the HW RoT.
+On a domain switch, the HW RoT can interrupt the harts, or the execution
+environment can call the HW RoT through a dedicated system interrupt or
+through a mailbox, to perform the required IOPMP, IOMPT, or IOMMU changes. This
+kind of domain isolation allows the ability to create domains that feature more
+capabilities than harts, e.g., NPUs, FPGAs, GPUs, etc. The latter is
+traditionally used when a set of computing elements and/or devices are not
+part of the TCB of the system. The most common example is a system which
+partitions the secure and non-secure domains between different resource
+clusters, e.g., a system contains a secure management engine which only
+executes authenticated code, and a non-secure compute cluster with
+Application Processors (APs) that can execute any code.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "HW RoT Domain Isolation"]
+image::img_ch4_DIsoSysLevel.drawio.png[]
 
 ==== Authorized boot
 
@@ -732,7 +569,7 @@ In the case of a Global Platform TEE system a rich OS in Normal domain is free
 to schedule services, including TEE services, on any Hart available to it. The
 number and make-up of supervisor domains can be known, and a simple convention
 can be used for common identification (SDID value, see
-xref:chapter3.adoc#_supervisor_domains[supervisor domains]) of Normal, TEE, and
+xref:chapter3.adoc#_supervisor_domains_and_mpt[supervisor domains]) of Normal, TEE, and
 Root domains across multiple Harts in a system.
 
 System integration in this context involves providing _security attributes_ on
@@ -827,7 +664,7 @@ Guarantees the system remains attestable.
 
 See xref:chapter2.adoc#_event_counters[event counters]
 
-=== Confidential computing on RISC-V (CoVE)
+=== Confidential Computing on RISC-V (CoVE)
 ==== Overview
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "Confidential compute use case"]
@@ -919,8 +756,8 @@ consent)
 RISC-V hardware enforced isolation mechanisms can be used as follows to meet
 those guarantees:
 
-See xref:chapter3.adoc#_supervisor_domains[supervisor domains].
-See xref:chapter3.adoc#_pmp_and_epmp[PMP and Smepmp]
+See xref:chapter3.adoc#_supervisor_domains_and_mpt[supervisor domains].
+See xref:chapter3.adoc#_pmp[PMP] and xref:chapter3.adoc#_smepmp[Smepmp]
 See xref:chapter3.adoc#_spmp[sPMP]
 See xref:chapter3.adoc#_mmu[MMU]
 See xref:chapter3.adoc#_mtt[MTT]
