@@ -244,16 +244,16 @@ The TEE model divides software into physically isolated domains:
 * Normal domain +
 Typically hosting a _rich OS_ (for example, RTOS or Linux), and user
 applications.
-* Confidential domain +
+* TEE domain +
 Hosts a _TEE OS_ (domain security manager) and _trusted applications (TA)_.
 * Root domain +
 Hosts RoT firmware, including a secure monitor.
 
 The TEE OS is primarily responsible for isolation of TA, and for providing root
-of trust services, within the Confidential domain.
+of trust services, within the TEE domain.
 
 The OS in Normal domain typically controls scheduling on the system, across all
-harts available to it. To interact with TA services in Confidential domain, the
+harts available to it. To interact with TA services in TEE domain, the
 OS in Normal domain interacts with a TEE OS through a secure monitor in Root
 domain.
 
@@ -272,7 +272,7 @@ allocation can be mostly static, making the system more deterministic. +
 _Use case examples:_ edge devices and IoT, automation, and automotive.
 * Virtualized TEE +
 On a virtualized system, TEE can also be virtualized. In this case a _secure
-partition manager_ (SPM) in Confidential domain is responsible for isolation of
+partition manager_ (SPM) in TEE domain is responsible for isolation of
 multiple TEE guests (for example, an OEM TEE and separate third party TEE).
 This model can also support more dynamic resource allocation. +
  +
@@ -298,11 +298,11 @@ itself from unintended access to resources assigned to a different domain
   SR_SUD_001 OR SR_SUD_002
 
 
-| Block resources assigned to Confidential domain from access by Normal domain
+| Block resources assigned to TEE domain from access by Normal domain
 | SR_SUD_001 OR SR_SUD_002, SR_SUD_003, SR_SUD_004
 
 | Allow resources assigned to Normal domain to be accessible to Normal domain
-(r/w/x), and to Confidential domain (r/w) (default sharing rule)
+(r/w/x), and to TEE domain (r/w) (default sharing rule)
 | SR_SUD_005
 
 | Ensure resources assigned to a single TA, or a guest TEE, are not accessible by a
@@ -321,9 +321,8 @@ to do so in specific use cases. For example, sharing media buffers in a secure
 media path. Such policies are enforced by SPM or TEE OS.
 
 Processes in Normal domain can share memory assigned to Normal domain when
-interacting with a TA in confidential world (default sharing rule). Such shared
-memory can be cached when context switching between Normal and Confidential
-domains.
+interacting with a TA in TEE domain (default sharing rule). Such shared memory
+can be cached when context switching between Normal and TEE domains.
 
 RISC-V hardware enforced isolation mechanisms can be used as follows to meet
 those guarantees:
@@ -341,11 +340,11 @@ See xref:chapter3.adoc#atp[Address Translation and Protection] +
 | Requirement
 | Reference
 
-| Use Supervisor domains to enforce isolation between Normal and Confidential domains, and to protect M-Mode from other domains
+| Use Supervisor domains to enforce isolation between Normal and TEE domains, and to protect M-Mode from other domains
 | SR_SUD_001 OR SR_SUD_002, SR_MPT_001, SR_MPT_002
 
 | For a static partition TEE, use PMP, SPMP, address translation and protection or MPT to enforce isolation
-between TA in Confidential domain.
+between TA in TEE domain.
 | SR_PMP_005 OR SR_ATP_003
 
 | For a virtualized TEE, use hypervisor extension
@@ -417,7 +416,7 @@ platform attestation.
 a|
 Attestation is used to determine trustworthiness across all components +
 
-* Confidential domain
+* TEE domain
 * Root domain
 * Boot state of all trusted subsystems
 | SR_ATT_001, SR_ATT_002, SR_ATT_003
@@ -456,7 +455,7 @@ exposure of cryptographic materials.
 | Requirement
 | Reference
 
-| Ensure Local sealing for a TA, or a TEE guest is unique to Confidential
+| Ensure Local sealing for a TA, or a TEE guest is unique to TEE
 domain and to a physical instance of a system.
 
 | SR_SUD_003, SR_SLG_002
@@ -469,10 +468,10 @@ or the TA. Local sealing may be layered
 
 For example:
 
-* Confidential domain unique sealing keys derived by a RoT from a hardware
+* TEE domain unique sealing keys derived by a RoT from a hardware
   unique key
 * TA, or guest TEE, unique sealing keys derived by TEE OS or SPM from a
-  Confidential domain unique sealing key
+  TEE domain unique sealing key
 
 ==== Device access control
 
@@ -493,13 +492,13 @@ and interrupts.
 | SR_IOP_004
 
 | Use IOMPT and IOMMU to enforce access rules for devices
-assigned to Normal or Confidential domains with a virtualized TEE, and IOPMP to enforce access rules
+assigned to Normal or TEE domains with a virtualized TEE, and IOPMP to enforce access rules
 for Root devices.
 | SR_IOM_001, SR_IOM_002, SR_IOM_003, SR_IOM_004, SR_IOM_005
 |===
 
 For a static partition TEE, domain level granularity can be sufficient as device
-access within Confidential and Normal domains is governed by TEE OS and the rich OS
+access within TEE and Normal domains is governed by TEE OS and the rich OS
 respectively. It can be implemented using IOPMP. Policy can be controlled by
 boot configuration, by a HW or FW RoT.
 
@@ -511,7 +510,7 @@ NOTE: IOMPT can also be sufficient for protecting Root devices in the sense that
 M-Mode can enforce that its own resources are never assigned to another domain.
 Use of IOPMP or similar could still add further protections. For example, a system
 may require that Root devices cannot be used to access memory assigned to
-Confidential domain.
+TEE domain.
 
 ==== System integration
 
@@ -520,11 +519,11 @@ to schedule services, including TEE services, on any hart available to it. The
 number and composition of supervisor domains can be known, and a simple convention
 can be used for common identification (SDID value, see
 xref:chapter3.adoc#_supervisor_domains[supervisor domains]) of Normal,
-Confidential, and Root domains across multiple harts in a system.
+TEE, and Root domains across multiple harts in a system.
 
 System integration in this context involves providing _security attributes_ on
 a system interconnect, tagging all transactions (CPU or system agent initiated)
-to either Root, Normal, or Confidential domains.
+to either Root, Normal, or TEE domains.
 
 Possible use cases include:
 
@@ -575,7 +574,7 @@ self-hosted debug for a user application. Or an HS-Mode hypervisor can enable
 self-hosted debug for a VS-Mode guest. Only Root domain should enable
 self-hosted debug for an S-Mode OS or an HS Mode hypervisor.
 
-Within Confidential domain a TEE OS can enable self-hosted debug for a TA. An
+Within TEE domain a TEE OS can enable self-hosted debug for a TA. An
 SPM can enable self-hosted debug for guest TEE. Only Root domain should enable
 self-hosted debug of SPM (virtualized) or TEE OS (non-virtualized).
 
@@ -591,7 +590,7 @@ A machine mode monitor can enable external debug of individual supervisor domain
 | SR_DBG_005
 |===
 
-For example, for all of Confidential domain on a production system, for
+For example, for all of TEE domain on a production system, for
 certification reasons.
 
 [width=100%]
