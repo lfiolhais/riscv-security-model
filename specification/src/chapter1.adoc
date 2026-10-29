@@ -108,7 +108,7 @@ may also be used to reference sources that are the origin of the requirement.
 
 The specification provides a set of requirements that, if combined in certain
 ways, result in contradictory security properties. The possible set of
-contraditions are by design. A security architect chooses a valid set of
+contradictions are by design. A security architect chooses a valid set of
 security requirements for their implementation, security policy, and threat
 model. The specification doesn't explicitly state mutually exclusive
 requirements.
