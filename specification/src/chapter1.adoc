@@ -110,8 +110,7 @@ The specification provides a set of requirements that, if combined in certain
 ways, result in contradictory security properties. The possible set of
 contradictions are by design. A security architect chooses a valid set of
 security requirements for their implementation, security policy, and threat
-model. The specification doesn't explicitly state mutually exclusive
-requirements.
+model.
 
 NOTE: All normative requirements are expressed as mandatory and some sections may
 include mutually exclusive requirements. A use case specific requirements document
